@@ -760,18 +760,23 @@ function build_libdeflate {
 	fi
 	cd ..
   	echo " done!"
-  }
 }
 function build_shell2 {
-	echo -n "[SSH2] downloading 1.9.0..."
-	download_file "https://github.com/libssh2/libssh2/releases/download/libssh2-1.9.0/libssh2-1.9.0.tar.gz" | tar -zx >> "$DIR/install.log" 2>&1
-	mv libssh2-1.9.0 ssh2
+  #NO WORK WITH STATIC
+	if [ "$DO_STATIC" == "yes" ]; then
+		local EXTRA_FLAGS="--disable-shared --enable-static"
+	else
+		local EXTRA_FLAGS="--enable-shared --disable-static"
+	fi
+	echo -n "[SSH2] downloading 1.10.0..."
+	download_file "https://github.com/libssh2/libssh2/releases/download/libssh2-1.10.0/libssh2-1.10.0.tar.gz" | tar -zx >> "$DIR/install.log" 2>&1
+	mv libssh2-1.10.0 ssh2
 	cd ssh2
 
 	echo -n " checking..."
-
 	RANLIB=$RANLIB ./configure \
 	--prefix="$DIR/bin/php7" \
+	$EXTRA_FLAGS \
 	$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
 	sed -i=".backup" 's/ tests win32/ win32/g' Makefile
 	echo -n " compiling..."
@@ -948,6 +953,10 @@ RANLIB=$RANLIB CFLAGS="$CFLAGS $FLAGS_LTO" CXXFLAGS="$CXXFLAGS $FLAGS_LTO" LDFLA
 --with-openssl \
 --with-ssh2 \
 --with-zip \
+--with-libbson \
+--with-libmongoc \
+--with-mongodb-system-libs \
+--with-mongodb-ssl="auto" \
 --with-libdeflate="$DIR/bin/php7" \
 $HAS_LIBJPEG \
 $HAS_GD \
@@ -1081,6 +1090,20 @@ if [ "$HAVE_OPCACHE" == "yes" ]; then
 	echo "opcache.jit_buffer_size=128M" >> "$DIR/bin/php7/bin/php.ini"
 fi
 
+echo " done!"
+
+echo -n "[MongoDB] downloading..."
+git clone https://github.com/mongodb/mongo-php-driver.git  >> "$DIR/install.log" 2>&1
+echo -n " checking..."
+cd mongo-php-driver
+git submodule update --init  >> "$DIR/install.log" 2>&1
+$DIR/bin/php7/bin/phpize >> "$DIR/install.log" 2>&1
+./configure --with-php-config="$DIR/bin/php7/bin/php-config" >> "$DIR/install.log" 2>&1
+echo -n " compiling..."
+make all >> "$DIR/install.log" 2>&1
+echo -n " installing..."
+make install >> "$DIR/install.log" 2>&1
+echo "extension=mongodb.so" >> "$DIR/bin/php7/bin/php.ini"
 echo " done!"
 
 if [[ "$DO_STATIC" != "yes" ]] && [[ "$COMPILE_DEBUG" == "yes" ]]; then
